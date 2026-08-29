@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SplitJar</title>
+<meta name="description" content="Split your money into jars, track goals, wishes and gift cards.">
+<meta name="theme-color" content="#12203E">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SplitJar">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -487,6 +497,15 @@
       </div>
       <div id="historyList"></div>
     </div>
+
+    <div class="card">
+      <label class="field-label">Backup</label>
+      <p class="blurb" style="margin:0 0 12px;">Your data is saved on this phone only. Save a backup file before switching phones or clearing your browser.</p>
+      <button class="add-money-btn" style="width:100%;" id="exportBtn">⬇︎ Save backup file</button>
+      <button class="add-money-btn" style="width:100%; margin-top:8px;" id="importBtn">⬆︎ Restore from backup</button>
+      <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+      <div class="add-msg" id="backupMsg"></div>
+    </div>
   </div>
 
   <div data-panel id="wishTab" hidden>
@@ -531,6 +550,33 @@
 </div>
 
 <script>
+/* ---------- Service worker: enables offline use and the install prompt ---------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js")
+      .catch(e => console.log("Service worker not registered:", e.message));
+  });
+}
+
+/* ---------- Storage ----------
+   Saves to this browser's localStorage. The API mirrors the one the app
+   was originally written against, so the rest of the code is unchanged.  */
+const storage = {
+  async get(key){
+    const value = localStorage.getItem(key);
+    if(value === null){ throw new Error("Key not found: " + key); }
+    return { key, value };
+  },
+  async set(key, value){
+    localStorage.setItem(key, value);
+    return { key, value };
+  },
+  async delete(key){
+    localStorage.removeItem(key);
+    return { key, deleted: true };
+  }
+};
+
 const METHODS = {
   "503020": {
     name: "50/30/20 Rule",
@@ -968,7 +1014,7 @@ function renderHistory(){
 
 /* ---------- Storage ---------- */
 async function saveLedger(){
-  try{ await window.storage.set(LEDGER_KEY, JSON.stringify({ balance: state.balance, transactions }), false); }
+  try{ await storage.set(LEDGER_KEY, JSON.stringify({ balance: state.balance, transactions }), false); }
   catch(e){ console.error("Storage error:", e); }
 }
 function queueSavePrefs(){
@@ -977,7 +1023,7 @@ function queueSavePrefs(){
 }
 async function savePrefsNow(){
   try{
-    await window.storage.set(PREFS_KEY, JSON.stringify({
+    await storage.set(PREFS_KEY, JSON.stringify({
       method: state.method,
       customWeights: state.customWeights,
       customLabels: state.customLabels,
@@ -991,7 +1037,7 @@ async function savePrefsNow(){
   }catch(e){ console.error("Storage error:", e); }
 }
 async function saveWishlist(){
-  try{ await window.storage.set(WISHLIST_KEY, JSON.stringify(wishlist), false); }
+  try{ await storage.set(WISHLIST_KEY, JSON.stringify(wishlist), false); }
   catch(e){ console.error("Storage error:", e); }
 }
 
@@ -999,11 +1045,11 @@ async function saveWishlist(){
    with an empty value — that way stale data can never survive a reset. */
 async function clearKey(key, emptyValue){
   try{
-    await window.storage.delete(key, false);
+    await storage.delete(key, false);
     return true;
   }catch(e){
     try{
-      await window.storage.set(key, emptyValue, false);
+      await storage.set(key, emptyValue, false);
       return true;
     }catch(e2){
       console.error("Could not clear " + key, e2);
@@ -1012,7 +1058,7 @@ async function clearKey(key, emptyValue){
   }
 }
 async function saveGiftCards(){
-  try{ await window.storage.set(GIFTCARDS_KEY, JSON.stringify(giftCards), false); }
+  try{ await storage.set(GIFTCARDS_KEY, JSON.stringify(giftCards), false); }
   catch(e){ console.error("Storage error:", e); }
 }
 
@@ -1367,10 +1413,112 @@ verdictWishBtn.addEventListener("click", async () => {
   showTab("wish");
 });
 
+/* ---------- Backup / restore ---------- */
+const exportBtn = $("#exportBtn");
+const importBtn = $("#importBtn");
+const importFileInput = $("#importFileInput");
+const backupMsg = $("#backupMsg");
+
+exportBtn.addEventListener("click", () => {
+  const backup = {
+    app: "SplitJar",
+    version: 1,
+    savedAt: new Date().toISOString(),
+    ledger: { balance: state.balance, transactions },
+    prefs: {
+      method: state.method,
+      customWeights: state.customWeights,
+      customLabels: state.customLabels,
+      goal: state.goal,
+      goalCelebrated: state.goalCelebrated,
+      wantsLabel: state.wantsLabel,
+      wantsAllowance: state.wantsAllowance,
+      wantsRemaining: state.wantsRemaining,
+      wantsWeekStart: state.wantsWeekStart
+    },
+    giftCards,
+    wishlist
+  };
+  try{
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `splitjar-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    backupMsg.textContent = "Backup saved to your downloads.";
+  }catch(e){
+    console.error("Export failed:", e);
+    backupMsg.textContent = "Couldn't save the backup file.";
+  }
+  setTimeout(() => { backupMsg.textContent = ""; }, 3000);
+});
+
+importBtn.addEventListener("click", () => importFileInput.click());
+
+importFileInput.addEventListener("change", async () => {
+  const file = importFileInput.files && importFileInput.files[0];
+  if(!file) return;
+  let backup;
+  try{
+    backup = JSON.parse(await file.text());
+  }catch(e){
+    backupMsg.textContent = "That file isn't a valid backup.";
+    importFileInput.value = "";
+    setTimeout(() => { backupMsg.textContent = ""; }, 3000);
+    return;
+  }
+  if(!backup || backup.app !== "SplitJar"){
+    backupMsg.textContent = "That file isn't a SplitJar backup.";
+    importFileInput.value = "";
+    setTimeout(() => { backupMsg.textContent = ""; }, 3000);
+    return;
+  }
+  const when = backup.savedAt ? new Date(backup.savedAt).toLocaleDateString() : "an earlier date";
+  const ok = await askConfirm("Restore this backup?", `This replaces everything currently in the app with the backup from ${when}.`, "Restore it");
+  importFileInput.value = "";
+  if(!ok) return;
+
+  const led = backup.ledger || {};
+  const prefs = backup.prefs || {};
+  state.balance = typeof led.balance === "number" ? led.balance : 0;
+  transactions = Array.isArray(led.transactions) ? led.transactions : [];
+  state.method = METHODS[prefs.method] ? prefs.method : "503020";
+  state.customWeights = Array.isArray(prefs.customWeights) ? prefs.customWeights : [40,35,25];
+  state.customLabels = Array.isArray(prefs.customLabels) ? prefs.customLabels : ["Save","Spend","Give"];
+  state.goal = typeof prefs.goal === "number" ? prefs.goal : null;
+  state.goalCelebrated = !!prefs.goalCelebrated;
+  state.wantsLabel = prefs.wantsLabel || "Wants";
+  state.wantsAllowance = typeof prefs.wantsAllowance === "number" ? prefs.wantsAllowance : 0;
+  state.wantsRemaining = typeof prefs.wantsRemaining === "number" ? prefs.wantsRemaining : 0;
+  state.wantsWeekStart = prefs.wantsWeekStart || null;
+  giftCards = Array.isArray(backup.giftCards) ? backup.giftCards : [];
+  wishlist = Array.isArray(backup.wishlist) ? backup.wishlist : [];
+
+  await saveLedger();
+  await savePrefsNow();
+  await saveGiftCards();
+  await saveWishlist();
+
+  if(!state.wantsWeekStart){ await resetWantsBudget(); }
+  goalInput.value = state.goal || "";
+  renderAll();
+  renderHistory();
+  renderGiftCards();
+  renderWishlist();
+  checkWeeklyReset();
+  backupMsg.textContent = "Backup restored.";
+  setTimeout(() => { backupMsg.textContent = ""; }, 3000);
+});
+
 /* ---------- Init ---------- */
 async function loadGiftCards(){
   try{
-    const res = await window.storage.get(GIFTCARDS_KEY, false);
+    const res = await storage.get(GIFTCARDS_KEY, false);
     giftCards = JSON.parse(res.value) || [];
   }catch(e){ giftCards = []; }
   renderGiftCards();
@@ -1378,7 +1526,7 @@ async function loadGiftCards(){
 
 async function loadWishlist(){
   try{
-    const res = await window.storage.get(WISHLIST_KEY, false);
+    const res = await storage.get(WISHLIST_KEY, false);
     wishlist = JSON.parse(res.value) || [];
   }catch(e){ wishlist = []; }
   renderWishlist();
@@ -1388,13 +1536,13 @@ async function init(){
   await loadGiftCards();
   await loadWishlist();
   try{
-    const res = await window.storage.get(LEDGER_KEY, false);
+    const res = await storage.get(LEDGER_KEY, false);
     const ledger = JSON.parse(res.value);
     state.balance = ledger.balance || 0;
     transactions = ledger.transactions || [];
     let hasWantsData = false;
     try{
-      const p = await window.storage.get(PREFS_KEY, false);
+      const p = await storage.get(PREFS_KEY, false);
       const prefs = JSON.parse(p.value);
       state.method = prefs.method || state.method;
       state.customWeights = prefs.customWeights || state.customWeights;
