@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SplitJar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#12203E;
+    --bg-card:#1B2C52;
+    --bg-card-soft:rgba(255,255,255,0.05);
+    --line:rgba(255,255,255,0.12);
+    --coral:#FF6F6F;
+    --gold:#FFD166;
+    --teal:#4ECDC4;
+    --purple:#A78BFA;
+    --pink:#F472B6;
+    --text:#F5F3EE;
+    --text-muted:#93A0C4;
+    --radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(120% 160% at 20% -10%, #1a2c56 0%, var(--bg-deep) 55%, #0d1730 100%);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:28px 16px 60px;
+  }
+  .app{ width:100%; max-width:430px; }
+  .app[hidden]{ display:none; }
+  header{ text-align:center; margin-bottom:16px; }
+  header h1{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:2.1rem;
+    margin:0 0 6px;
+    letter-spacing:0.5px;
+  }
+  header p{ margin:0; color:var(--text-muted); font-size:0.92rem; }
+
+  .tabbar{
+    display:flex; gap:6px;
+    background:var(--bg-card-soft);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:4px;
+    margin-bottom:16px;
+  }
+  .tab-btn{
+    flex:1; background:transparent; border:none;
+    color:var(--text-muted);
+    font-family:'Inter',sans-serif; font-weight:700; font-size:0.88rem;
+    padding:10px 0; border-radius:11px; cursor:pointer;
+  }
+  .tab-btn.active{ background:var(--text); color:var(--bg-deep); }
+  [data-panel][hidden]{ display:none; }
+
+  .card{
+    background:var(--bg-card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:16px;
+  }
+  label.field-label{
+    display:block; font-size:0.82rem; color:var(--text-muted);
+    margin-bottom:8px; font-weight:600;
+  }
+  .amount-wrap{
+    display:flex; align-items:center;
+    background:var(--bg-card-soft);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:10px 16px;
+  }
+  .amount-wrap span{
+    font-family:'Space Mono',monospace; font-size:1.4rem;
+    color:var(--text-muted); margin-right:6px;
+  }
+  .amount-wrap input{
+    flex:1; background:transparent; border:none; outline:none;
+    color:var(--text); font-family:'Space Mono',monospace;
+    font-size:1.4rem; width:100%; min-width:0;
+  }
+  .amount-wrap input::placeholder{ color:#5b6690; }
+
+  .overlay{
+    position:fixed; inset:0; background:rgba(8,12,26,0.9);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px; z-index:50;
+  }
+  .overlay[hidden]{ display:none; }
+  .modal{
+    background:var(--bg-card); border:1px solid var(--line);
+    border-radius:22px; padding:28px 24px; max-width:340px; width:100%; text-align:center;
+  }
+  .modal h2{ font-family:'Baloo 2',sans-serif; font-size:1.4rem; margin:0 0 8px; }
+  .modal p{ color:var(--text-muted); font-size:0.88rem; margin:0 0 18px; }
+  .modal .amount-wrap{ margin-bottom:16px; }
+  .primary-btn{
+    width:100%; border:none; border-radius:14px; padding:14px;
+    font-family:'Baloo 2',sans-serif; font-weight:700; font-size:1rem;
+    color:var(--bg-deep);
+    background:linear-gradient(90deg, var(--coral), var(--gold), var(--teal));
+    cursor:pointer;
+  }
+  .primary-btn:active{ transform:scale(0.99); }
+
+  .confetti-wrap{ position:relative; height:0; overflow:visible; }
+  .confetti-piece{
+    position:absolute; top:-10px; width:8px; height:14px; border-radius:2px;
+    animation:confettiFall 1.4s ease-in forwards;
+  }
+  @keyframes confettiFall{ to{ transform:translateY(170px) rotate(360deg); opacity:0; } }
+  @media (prefers-reduced-motion: reduce){ .confetti-piece{ animation:none; opacity:0; } }
+
+  .piggy-card{ text-align:center; }
+  .piggy-wrap{ position:relative; width:100%; max-width:320px; margin:0 auto 4px; aspect-ratio:300/220; }
+  .piggy-wrap svg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+  .pig-line, .pig-body{ fill:rgba(255,255,255,0.06); stroke:rgba(255,255,255,0.45); stroke-width:3; }
+  .pig-dot{ fill:rgba(255,255,255,0.65); }
+  .pig-slot{ fill:rgba(255,255,255,0.55); }
+  #piggyLiquid{ transition: y 0.9s cubic-bezier(.22,1,.36,1), height 0.9s cubic-bezier(.22,1,.36,1); }
+  .piggy-total{
+    position:absolute; left:50%; top:46%; transform:translate(-50%,-50%);
+    font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.9rem; color:#fff;
+    text-shadow:0 2px 10px rgba(0,0,0,0.5); text-align:center; white-space:nowrap;
+  }
+  .piggy-caption{ color:var(--text-muted); font-size:0.8rem; margin:6px 0 16px; }
+  .add-money-btn{
+    background:rgba(255,255,255,0.08); border:1px solid var(--line); color:var(--text);
+    font-family:'Inter',sans-serif; font-weight:700; font-size:0.9rem;
+    padding:11px 18px; border-radius:999px; cursor:pointer;
+  }
+  .add-money-btn:hover{ border-color:rgba(255,255,255,0.4); }
+  .add-money-btn.small{ padding:7px 14px; font-size:0.8rem; }
+  .add-money-panel{ display:flex; gap:8px; margin-top:12px; }
+  .add-money-panel[hidden]{ display:none; }
+  .add-money-panel .amount-wrap{ flex:1; margin-bottom:0; padding:8px 14px; }
+  .add-money-panel input{ font-size:1.1rem; }
+  .add-money-panel button{
+    border:none; border-radius:14px; padding:0 18px;
+    font-family:'Baloo 2',sans-serif; font-weight:700;
+    background:var(--teal); color:var(--bg-deep); cursor:pointer;
+  }
+  .add-msg{ font-size:0.8rem; color:var(--text-muted); margin-top:8px; min-height:1em; }
+
+  .goal-row{ display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:6px; font-family:'Space Mono',monospace; }
+  .goal-bar{ width:100%; height:10px; background:rgba(255,255,255,0.1); border-radius:6px; overflow:hidden; margin-bottom:14px; }
+  .goal-bar-fill{ height:100%; background:linear-gradient(90deg,var(--coral),var(--gold),var(--teal)); width:0%; transition:width 0.8s ease; }
+  .goal-actions{ display:flex; gap:8px; margin-top:10px; }
+  .goal-actions .primary-btn{ flex:1; }
+  .ghost-btn{
+    background:none; border:1px solid var(--line); color:var(--text-muted);
+    font-size:0.82rem; font-weight:600; padding:0 16px; border-radius:14px; cursor:pointer;
+  }
+  .ghost-btn[hidden]{ display:none; }
+
+  .methods{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-top:4px; scrollbar-width:none; }
+  .methods::-webkit-scrollbar{ display:none; }
+  .chip{
+    flex:0 0 auto; background:var(--bg-card-soft); border:1px solid var(--line);
+    color:var(--text-muted); font-family:'Inter',sans-serif; font-weight:600; font-size:0.82rem;
+    padding:9px 14px; border-radius:999px; cursor:pointer; transition:all 0.2s ease; white-space:nowrap;
+  }
+  .chip:hover{ border-color:rgba(255,255,255,0.35); }
+  .chip.active{ background:var(--text); color:var(--bg-deep); border-color:var(--text); }
+  .chip:focus-visible, button:focus-visible, input:focus-visible{ outline:2px solid var(--teal); outline-offset:2px; }
+  .blurb{ margin:12px 2px 0; font-size:0.82rem; color:var(--text-muted); }
+
+  .custom-panel{ margin-top:16px; display:flex; flex-direction:column; gap:14px; }
+  .custom-row{ display:flex; flex-direction:column; gap:6px; }
+  .custom-row-top{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .custom-row input[type="text"]{
+    background:transparent; border:none; border-bottom:1px solid var(--line);
+    color:var(--text); font-family:'Inter',sans-serif; font-weight:600; font-size:0.88rem;
+    padding:2px 2px 4px; width:60%;
+  }
+  .custom-row .pct-readout{ font-family:'Space Mono',monospace; font-size:0.85rem; color:var(--text-muted); }
+  input[type="range"]{ -webkit-appearance:none; width:100%; height:6px; border-radius:4px; background:rgba(255,255,255,0.15); }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+    background:var(--text); cursor:pointer; border:3px solid var(--bg-deep);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:18px; height:18px; border-radius:50%; background:var(--text); cursor:pointer; border:3px solid var(--bg-deep);
+  }
+
+  .jars-row{ display:flex; justify-content:space-between; gap:12px; padding:6px 4px 4px; }
+  .jar-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; animation:riseIn 0.5s ease both; }
+  .jar-col:nth-child(2){ animation-delay:0.06s; }
+  .jar-col:nth-child(3){ animation-delay:0.12s; }
+  @keyframes riseIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .jar{
+    position:relative; width:100%; max-width:104px; aspect-ratio:3/4;
+    background:rgba(255,255,255,0.04); border:2px solid rgba(255,255,255,0.18);
+    border-radius:14px 14px 26px 26px; overflow:hidden;
+  }
+  .jar::after{
+    content:''; position:absolute; top:-9px; left:22%; width:56%; height:10px;
+    background:rgba(255,255,255,0.22); border-radius:5px 5px 0 0;
+  }
+  .jar-liquid{ position:absolute; bottom:0; left:0; right:0; height:0%; transition:height 0.9s cubic-bezier(.22,1,.36,1); }
+  .jar-liquid::before{
+    content:''; position:absolute; top:-8px; left:-10px; right:-10px; height:12px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 12'%3E%3Cpath d='M0 6 Q10 0 20 6 T40 6 V12 H0 Z' fill='white' fill-opacity='0.25'/%3E%3C/svg%3E");
+    background-repeat:repeat-x; background-size:40px 12px; animation:waveScroll 3s linear infinite;
+  }
+  @keyframes waveScroll{ from{background-position-x:0;} to{background-position-x:-40px;} }
+  @media (prefers-reduced-motion: reduce){ .jar-liquid::before{ animation:none; } .jar-col{ animation:none; } }
+  .jar-name{ font-weight:700; font-size:0.82rem; text-align:center; }
+  .jar-amount{ font-family:'Space Mono',monospace; font-weight:700; font-size:0.95rem; }
+  .jar-pct{ font-size:0.74rem; color:var(--text-muted); }
+
+  .history-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .history-head h2{ font-family:'Baloo 2',sans-serif; font-size:1.05rem; margin:0; }
+  .clear-btn{ background:none; border:none; color:var(--text-muted); font-size:0.78rem; cursor:pointer; text-decoration:underline; }
+  .history-empty{ color:var(--text-muted); font-size:0.85rem; text-align:center; padding:14px 0; }
+  .history-item{
+    display:flex; align-items:center; gap:12px; background:var(--bg-card-soft);
+    border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px;
+  }
+  .history-dot{ width:10px; height:10px; border-radius:50%; flex:0 0 auto; }
+  .history-info{ flex:1; min-width:0; }
+  .history-amount{ font-family:'Space Mono',monospace; font-weight:700; font-size:0.92rem; }
+  .history-meta{ font-size:0.74rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .gc-total{ font-family:'Space Mono',monospace; font-weight:700; font-size:1.8rem; }
+  .add-gc-panel{ display:flex; flex-direction:column; margin-top:12px; }
+  .add-gc-panel[hidden]{ display:none; }
+  .add-gc-panel .amount-wrap{ margin-top:8px; margin-bottom:0; }
+  .gc-name-input{
+    width:100%; background:var(--bg-card-soft); border:1px solid var(--line);
+    border-radius:14px; padding:10px 14px; color:var(--text); font-family:'Inter',sans-serif; font-size:0.95rem;
+  }
+  .gc-item{
+    display:flex; align-items:center; gap:12px; background:var(--bg-card-soft);
+    border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px;
+  }
+  .gc-badge{
+    width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-family:'Baloo 2',sans-serif; font-weight:800; color:#12203E; flex:0 0 auto;
+  }
+  .gc-info{ flex:1; min-width:0; }
+  .gc-name{ font-weight:700; font-size:0.88rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .gc-balance{ font-family:'Space Mono',monospace; font-size:0.85rem; color:var(--text-muted); }
+  .gc-spend-btn{
+    background:rgba(255,255,255,0.1); border:1px solid var(--line); color:var(--text);
+    font-size:0.76rem; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer;
+  }
+  .gc-del-btn{ background:none; border:none; color:var(--text-muted); font-size:1rem; cursor:pointer; padding:4px; }
+
+  .refill-note{ font-size:0.72rem; color:var(--text-muted); white-space:nowrap; }
+  .spend-msg-block{ font-size:0.8rem; color:var(--text-muted); margin-top:8px; min-height:1em; }
+
+  .wish-item{
+    background:var(--bg-card-soft); border:1px solid var(--line); border-radius:12px;
+    padding:12px; margin-bottom:10px;
+  }
+  .wish-top{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+  .wish-name{ font-weight:700; font-size:0.92rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wish-add-btn{ margin-top:8px; width:100%; }
+
+  .checker-btn{ margin-top:10px; width:100%; }
+  .modal.wide{ max-width:360px; text-align:left; }
+  .modal.wide h2{ text-align:center; }
+  .checker-progress{
+    font-family:'Space Mono',monospace; font-size:0.74rem; color:var(--text-muted);
+    text-align:center; margin-bottom:12px; letter-spacing:1px;
+  }
+  .checker-q{ font-size:1rem; font-weight:600; line-height:1.45; margin:0 0 18px; text-align:center; }
+  .checker-answers{ display:flex; gap:10px; }
+  .checker-answers button{
+    flex:1; border:1px solid var(--line); background:var(--bg-card-soft); color:var(--text);
+    font-family:'Inter',sans-serif; font-weight:700; font-size:0.95rem;
+    padding:13px 0; border-radius:14px; cursor:pointer;
+  }
+  .checker-answers button:hover{ border-color:rgba(255,255,255,0.45); }
+  .verdict-badge{
+    font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.35rem;
+    text-align:center; margin-bottom:8px;
+  }
+  .verdict-text{ font-size:0.88rem; color:var(--text-muted); text-align:center; margin:0 0 18px; line-height:1.5; }
+  .verdict-actions{ display:flex; flex-direction:column; gap:8px; }
+  .verdict-actions button{
+    width:100%; border-radius:14px; padding:12px; font-family:'Inter',sans-serif;
+    font-weight:700; font-size:0.9rem; cursor:pointer;
+    border:1px solid var(--line); background:var(--bg-card-soft); color:var(--text);
+  }
+  .verdict-actions .primary-btn{ border:none; font-family:'Baloo 2',sans-serif; color:var(--bg-deep); }
+  .checker-warn{ font-size:0.78rem; color:var(--coral); text-align:center; margin-top:10px; min-height:1em; }
+</style>
+</head>
+<body>
+
+<div class="overlay" id="onboardOverlay">
+  <div class="modal">
+    <h2>Welcome to SplitJar 🫙</h2>
+    <p>Let's start with how much money you have right now.</p>
+    <div class="amount-wrap">
+      <span>$</span>
+      <input id="onboardInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+    </div>
+    <button class="primary-btn" id="onboardBtn">Let's go</button>
+  </div>
+</div>
+
+<div class="overlay" id="celebrateOverlay" hidden>
+  <div class="modal">
+    <div class="confetti-wrap" id="confettiWrap"></div>
+    <h2>🎉 Goal reached!</h2>
+    <p id="celebrateText"></p>
+    <button class="primary-btn" id="celebrateCloseBtn">Nice!</button>
+  </div>
+</div>
+
+<div class="overlay" id="checkerOverlay" hidden>
+  <div class="modal wide">
+    <h2 id="checkerTitle">Want or Need?</h2>
+
+    <div id="checkerStart">
+      <p>Thinking about buying something? Answer 5 quick questions first.</p>
+      <input type="text" id="checkerItemInput" class="gc-name-input" placeholder="What is it? (e.g. new hoodie)" maxlength="30">
+      <div class="amount-wrap" style="margin-top:8px;">
+        <span>$</span>
+        <input id="checkerPriceInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <button class="primary-btn" id="checkerStartBtn" style="margin-top:14px;">Start</button>
+      <button class="ghost-btn" id="checkerCancelBtn" style="width:100%; margin-top:8px; padding:11px 0;">Never mind</button>
+    </div>
+
+    <div id="checkerQuestion" hidden>
+      <div class="checker-progress" id="checkerProgress"></div>
+      <p class="checker-q" id="checkerQText"></p>
+      <div class="checker-answers">
+        <button id="checkerYesBtn">Yes</button>
+        <button id="checkerNoBtn">No</button>
+      </div>
+    </div>
+
+    <div id="checkerResult" hidden>
+      <div class="verdict-badge" id="verdictBadge"></div>
+      <p class="verdict-text" id="verdictText"></p>
+      <div class="verdict-actions">
+        <button class="primary-btn" id="verdictSpendBtn">Buy it — log the spend</button>
+        <button id="verdictWishBtn">Add to wish list instead</button>
+        <button id="verdictCloseBtn">Close</button>
+      </div>
+      <div class="checker-warn" id="checkerWarn"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="confirmOverlay" hidden>
+  <div class="modal">
+    <h2 id="confirmTitle">Are you sure?</h2>
+    <p id="confirmMessage"></p>
+    <button class="primary-btn" id="confirmYesBtn">Yes, do it</button>
+    <button class="ghost-btn" id="confirmNoBtn" style="width:100%; margin-top:8px; padding:11px 0;">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="promptOverlay" hidden>
+  <div class="modal">
+    <h2 id="promptTitle"></h2>
+    <p id="promptMessage"></p>
+    <div class="amount-wrap">
+      <span>$</span>
+      <input id="promptAmountInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+    </div>
+    <button class="primary-btn" id="promptOkBtn" style="margin-top:14px;">Confirm</button>
+    <button class="ghost-btn" id="promptCancelBtn" style="width:100%; margin-top:8px; padding:11px 0;">Cancel</button>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <header>
+    <h1>SplitJar 🫙</h1>
+    <p>Watch your money grow, then split it into jars.</p>
+  </header>
+
+  <div class="tabbar">
+    <button class="tab-btn active" id="tabCashBtn">💰 Cash</button>
+    <button class="tab-btn" id="tabWishBtn">🎯 Wishes</button>
+    <button class="tab-btn" id="tabGiftBtn">🎁 Cards</button>
+  </div>
+
+  <div data-panel id="cashTab">
+    <div class="card piggy-card">
+      <div class="piggy-wrap">
+        <svg viewBox="0 0 300 220">
+          <defs>
+            <clipPath id="piggyClip"><ellipse cx="150" cy="125" rx="108" ry="68"/></clipPath>
+            <linearGradient id="liquidGradient" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#FF6F6F"/>
+              <stop offset="50%" stop-color="#FFD166"/>
+              <stop offset="100%" stop-color="#4ECDC4"/>
+            </linearGradient>
+          </defs>
+          <path class="pig-line" d="M42,115 q-18,-8 -8,-28 q12,8 8,28 Z"/>
+          <rect class="pig-line" x="72" y="178" width="20" height="34" rx="8"/>
+          <rect class="pig-line" x="118" y="182" width="20" height="34" rx="8"/>
+          <rect class="pig-line" x="168" y="182" width="20" height="34" rx="8"/>
+          <rect class="pig-line" x="214" y="178" width="20" height="34" rx="8"/>
+          <path class="pig-line" d="M205,65 q10,-25 35,-20 q-8,20 -25,30 Z"/>
+          <ellipse class="pig-body" cx="150" cy="125" rx="108" ry="68"/>
+          <g clip-path="url(#piggyClip)">
+            <rect id="piggyLiquid" x="0" width="300" y="193" height="0" fill="url(#liquidGradient)" opacity="0.85"/>
+          </g>
+          <ellipse class="pig-line" cx="252" cy="132" rx="30" ry="22"/>
+          <circle class="pig-dot" cx="244" cy="132" r="3.5"/>
+          <circle class="pig-dot" cx="260" cy="132" r="3.5"/>
+          <circle class="pig-dot" cx="196" cy="102" r="4"/>
+          <rect class="pig-slot" x="132" y="54" width="36" height="7" rx="3"/>
+        </svg>
+        <div class="piggy-total" id="piggyTotal">$0.00</div>
+      </div>
+      <p class="piggy-caption">Total money you've got</p>
+      <button class="add-money-btn" id="addMoneyBtn">+ Add Money</button>
+      <div class="add-money-panel" id="addMoneyPanel" hidden>
+        <div class="amount-wrap">
+          <span>$</span>
+          <input id="addAmountInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <button id="confirmAddBtn">Add</button>
+      </div>
+      <div class="add-msg" id="addMsg"></div>
+    </div>
+
+    <div class="card">
+      <label class="field-label">Savings goal</label>
+      <div id="goalProgressWrap" hidden>
+        <div class="goal-row"><span id="goalCurrentText"></span><span id="goalTargetText"></span></div>
+        <div class="goal-bar"><div class="goal-bar-fill" id="goalBarFill"></div></div>
+      </div>
+      <div class="amount-wrap">
+        <span>$</span>
+        <input id="goalInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="e.g. 100.00">
+      </div>
+      <div class="goal-actions">
+        <button class="primary-btn" id="setGoalBtn">Save goal</button>
+        <button class="ghost-btn" id="clearGoalBtn" hidden>Clear</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="field-label">How should it split?</label>
+      <div class="methods" id="methodRow"></div>
+      <p class="blurb" id="blurbText"></p>
+      <div class="custom-panel" id="customPanel" hidden></div>
+    </div>
+
+    <div class="card">
+      <div class="jars-row" id="jarsRow"></div>
+    </div>
+
+    <div class="card">
+      <div class="history-head">
+        <h2 id="spendCardTitle">Weekly budget</h2>
+        <span class="refill-note" id="refillNote"></span>
+      </div>
+      <div class="goal-row"><span id="spendRemainingText"></span><span id="spendAllowanceText"></span></div>
+      <div class="goal-bar"><div class="goal-bar-fill" id="spendBarFill"></div></div>
+      <button class="add-money-btn" id="spendBtn">− Spend</button>
+      <button class="add-money-btn checker-btn" id="openCheckerBtn">🤔 Want or Need?</button>
+      <div class="add-gc-panel" id="spendPanel" hidden>
+        <div class="amount-wrap">
+          <span>$</span>
+          <input id="spendAmountInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <input type="text" id="spendNoteInput" class="gc-name-input" placeholder="What was it for? (optional)" maxlength="30" style="margin-top:8px;">
+        <button class="primary-btn" id="confirmSpendBtn" style="margin-top:8px;">Spend</button>
+      </div>
+      <div class="spend-msg-block" id="spendMsg"></div>
+    </div>
+
+    <div class="card">
+      <div class="history-head">
+        <h2>Activity</h2>
+        <button class="clear-btn" id="resetBtn">Reset all data</button>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <div data-panel id="wishTab" hidden>
+    <div class="card">
+      <div class="history-head">
+        <h2>Wish List</h2>
+        <button class="add-money-btn small" id="addWishBtn">+ Add</button>
+      </div>
+      <div class="add-gc-panel" id="addWishPanel" hidden>
+        <input type="text" id="wishNameInput" class="gc-name-input" placeholder="What do you want? (e.g. New shoes)" maxlength="30">
+        <div class="amount-wrap">
+          <span>$</span>
+          <input id="wishTargetInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <button class="primary-btn" id="confirmWishBtn" style="margin-top:8px;">Add to wish list</button>
+      </div>
+      <div id="wishList"></div>
+    </div>
+  </div>
+
+  <div data-panel id="giftTab" hidden>
+    <div class="card">
+      <label class="field-label">Total on gift cards</label>
+      <div class="gc-total" id="gcTotal">$0.00</div>
+    </div>
+    <div class="card">
+      <div class="history-head">
+        <h2>Your gift cards</h2>
+        <button class="add-money-btn small" id="addGcBtn">+ Add</button>
+      </div>
+      <div class="add-gc-panel" id="addGcPanel" hidden>
+        <input type="text" id="gcNameInput" class="gc-name-input" placeholder="Store name (e.g. Target)" maxlength="24">
+        <div class="amount-wrap">
+          <span>$</span>
+          <input id="gcBalanceInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <button class="primary-btn" id="confirmGcBtn" style="margin-top:8px;">Add card</button>
+      </div>
+      <div id="gcList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const METHODS = {
+  "503020": {
+    name: "50/30/20 Rule",
+    blurb: "A classic budget rule: half your money on needs, less on wants, and a solid chunk saved.",
+    cats: [ { label: "Needs", pct: 50 }, { label: "Wants", pct: 30 }, { label: "Savings", pct: 20 } ],
+    spendIndex: 1
+  },
+  "ssg": {
+    name: "Save · Spend · Give",
+    blurb: "The classic three-jar method — even split between saving, spending, and giving.",
+    cats: [ { label: "Save", pct: 34 }, { label: "Spend", pct: 33 }, { label: "Give", pct: 33 } ],
+    spendIndex: 1
+  },
+  "702010": {
+    name: "70/20/10",
+    blurb: "Popular in teen money apps — mostly spend, some saved, a little given away.",
+    cats: [ { label: "Spend", pct: 70 }, { label: "Save", pct: 20 }, { label: "Give", pct: 10 } ],
+    spendIndex: 0
+  },
+  "custom": {
+    name: "Custom mix",
+    blurb: "Drag the sliders to build your own split. Name each jar whatever you want.",
+    cats: [ { label: "Save", pct: 40 }, { label: "Spend", pct: 35 }, { label: "Give", pct: 25 } ],
+    spendIndex: 1
+  }
+};
+const COLORS = ["#FF6F6F", "#FFD166", "#4ECDC4"];
+const GC_COLORS = ["#FF6F6F", "#FFD166", "#4ECDC4", "#A78BFA", "#F472B6", "#60A5FA"];
+const LEDGER_KEY = "splitjar-ledger";
+const PREFS_KEY = "splitjar-prefs";
+const GIFTCARDS_KEY = "splitjar-giftcards";
+const WISHLIST_KEY = "splitjar-wishlist";
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+let state = {
+  balance: 0,
+  method: "503020",
+  customWeights: [40, 35, 25],
+  customLabels: ["Save", "Spend", "Give"],
+  goal: null,
+  goalCelebrated: false,
+  wantsLabel: "Wants",
+  wantsAllowance: 0,
+  wantsRemaining: 0,
+  wantsWeekStart: null
+};
+let transactions = [];
+let giftCards = [];
+let wishlist = [];
+let prefsSaveTimer = null;
+
+const $ = (sel) => document.querySelector(sel);
+const onboardOverlay = $("#onboardOverlay");
+const onboardInput = $("#onboardInput");
+const onboardBtn = $("#onboardBtn");
+const celebrateOverlay = $("#celebrateOverlay");
+const celebrateText = $("#celebrateText");
+const celebrateCloseBtn = $("#celebrateCloseBtn");
+const confettiWrap = $("#confettiWrap");
+const appEl = $("#app");
+const tabCashBtn = $("#tabCashBtn");
+const tabWishBtn = $("#tabWishBtn");
+const tabGiftBtn = $("#tabGiftBtn");
+const cashTab = $("#cashTab");
+const wishTab = $("#wishTab");
+const giftTab = $("#giftTab");
+const spendCardTitle = $("#spendCardTitle");
+const refillNote = $("#refillNote");
+const spendRemainingText = $("#spendRemainingText");
+const spendAllowanceText = $("#spendAllowanceText");
+const spendBarFill = $("#spendBarFill");
+const spendBtn = $("#spendBtn");
+const spendPanel = $("#spendPanel");
+const spendAmountInput = $("#spendAmountInput");
+const spendNoteInput = $("#spendNoteInput");
+const confirmSpendBtn = $("#confirmSpendBtn");
+const spendMsg = $("#spendMsg");
+const addWishBtn = $("#addWishBtn");
+const addWishPanel = $("#addWishPanel");
+const wishNameInput = $("#wishNameInput");
+const wishTargetInput = $("#wishTargetInput");
+const confirmWishBtn = $("#confirmWishBtn");
+const wishList = $("#wishList");
+const piggyTotal = $("#piggyTotal");
+const piggyLiquid = $("#piggyLiquid");
+const addMoneyBtn = $("#addMoneyBtn");
+const addMoneyPanel = $("#addMoneyPanel");
+const addAmountInput = $("#addAmountInput");
+const confirmAddBtn = $("#confirmAddBtn");
+const addMsg = $("#addMsg");
+const goalProgressWrap = $("#goalProgressWrap");
+const goalCurrentText = $("#goalCurrentText");
+const goalTargetText = $("#goalTargetText");
+const goalBarFill = $("#goalBarFill");
+const goalInput = $("#goalInput");
+const setGoalBtn = $("#setGoalBtn");
+const clearGoalBtn = $("#clearGoalBtn");
+const methodRow = $("#methodRow");
+const blurbText = $("#blurbText");
+const customPanel = $("#customPanel");
+const jarsRow = $("#jarsRow");
+const historyList = $("#historyList");
+const resetBtn = $("#resetBtn");
+const gcTotal = $("#gcTotal");
+const addGcBtn = $("#addGcBtn");
+const addGcPanel = $("#addGcPanel");
+const gcNameInput = $("#gcNameInput");
+const gcBalanceInput = $("#gcBalanceInput");
+const confirmGcBtn = $("#confirmGcBtn");
+const gcList = $("#gcList");
+
+function fmtMoney(n){
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/* ---------- In-app dialogs (browser confirm/prompt are blocked in sandbox) ---------- */
+const confirmOverlay = $("#confirmOverlay");
+const confirmTitle = $("#confirmTitle");
+const confirmMessage = $("#confirmMessage");
+const confirmYesBtn = $("#confirmYesBtn");
+const confirmNoBtn = $("#confirmNoBtn");
+const promptOverlay = $("#promptOverlay");
+const promptTitle = $("#promptTitle");
+const promptMessage = $("#promptMessage");
+const promptAmountInput = $("#promptAmountInput");
+const promptOkBtn = $("#promptOkBtn");
+const promptCancelBtn = $("#promptCancelBtn");
+
+let confirmResolve = null;
+let promptResolve = null;
+
+function askConfirm(title, message, yesLabel){
+  confirmTitle.textContent = title;
+  confirmMessage.textContent = message;
+  confirmYesBtn.textContent = yesLabel || "Yes, do it";
+  confirmOverlay.hidden = false;
+  return new Promise(resolve => { confirmResolve = resolve; });
+}
+function settleConfirm(value){
+  confirmOverlay.hidden = true;
+  if(confirmResolve){ confirmResolve(value); confirmResolve = null; }
+}
+confirmYesBtn.addEventListener("click", () => settleConfirm(true));
+confirmNoBtn.addEventListener("click", () => settleConfirm(false));
+
+function askAmount(title, message){
+  promptTitle.textContent = title;
+  promptMessage.textContent = message;
+  promptAmountInput.value = "";
+  promptOverlay.hidden = false;
+  setTimeout(() => promptAmountInput.focus(), 50);
+  return new Promise(resolve => { promptResolve = resolve; });
+}
+function settlePrompt(value){
+  promptOverlay.hidden = true;
+  if(promptResolve){ promptResolve(value); promptResolve = null; }
+}
+promptOkBtn.addEventListener("click", () => {
+  const val = parseFloat(promptAmountInput.value);
+  settlePrompt(isNaN(val) || val <= 0 ? null : val);
+});
+promptCancelBtn.addEventListener("click", () => settlePrompt(null));
+promptAmountInput.addEventListener("keydown", (e) => {
+  if(e.key === "Enter"){ promptOkBtn.click(); }
+});
+
+function currentCats(){
+  if(state.method === "custom"){
+    const total = state.customWeights.reduce((a,b)=>a+b,0) || 1;
+    return state.customWeights.map((w,i) => ({
+      label: state.customLabels[i] || `Category ${i+1}`,
+      pct: (w/total)*100
+    }));
+  }
+  return METHODS[state.method].cats;
+}
+
+/* ---------- Tabs ---------- */
+function showTab(name){
+  tabCashBtn.classList.toggle("active", name === "cash");
+  tabWishBtn.classList.toggle("active", name === "wish");
+  tabGiftBtn.classList.toggle("active", name === "gift");
+  cashTab.hidden = name !== "cash";
+  wishTab.hidden = name !== "wish";
+  giftTab.hidden = name !== "gift";
+}
+tabCashBtn.addEventListener("click", () => showTab("cash"));
+tabWishBtn.addEventListener("click", () => showTab("wish"));
+tabGiftBtn.addEventListener("click", () => showTab("gift"));
+
+/* ---------- Piggy + goal ---------- */
+function renderPiggy(){
+  piggyTotal.textContent = fmtMoney(state.balance);
+  const pct = 100 * (1 - 1/(1 + state.balance/40));
+  const bodyTop = 57, bodyBottom = 193, maxPx = bodyBottom - bodyTop;
+  const fillPx = Math.max(0, Math.min(maxPx, (pct/100) * maxPx));
+  piggyLiquid.setAttribute("y", bodyBottom - fillPx);
+  piggyLiquid.setAttribute("height", fillPx);
+}
+
+function renderGoal(){
+  if(state.goal && state.goal > 0){
+    goalProgressWrap.hidden = false;
+    clearGoalBtn.hidden = false;
+    goalCurrentText.textContent = fmtMoney(state.balance);
+    goalTargetText.textContent = "of " + fmtMoney(state.goal);
+    const pct = Math.max(0, Math.min(100, (state.balance/state.goal)*100));
+    goalBarFill.style.width = pct + "%";
+    goalInput.value = state.goal;
+  }else{
+    goalProgressWrap.hidden = true;
+    clearGoalBtn.hidden = true;
+  }
+}
+
+function spawnConfetti(){
+  confettiWrap.innerHTML = "";
+  const colors = ["#FF6F6F","#FFD166","#4ECDC4","#A78BFA","#F472B6"];
+  for(let i=0;i<16;i++){
+    const el = document.createElement("div");
+    el.className = "confetti-piece";
+    el.style.left = Math.random()*100 + "%";
+    el.style.background = colors[i % colors.length];
+    el.style.animationDelay = (Math.random()*0.5) + "s";
+    el.style.transform = `rotate(${Math.random()*360}deg)`;
+    confettiWrap.appendChild(el);
+  }
+}
+
+function checkGoalAchievement(){
+  if(state.goal && state.goal > 0 && state.balance >= state.goal && !state.goalCelebrated){
+    state.goalCelebrated = true;
+    celebrateText.textContent = `You saved ${fmtMoney(state.balance)} — your goal of ${fmtMoney(state.goal)} is hit!`;
+    spawnConfetti();
+    celebrateOverlay.hidden = false;
+    queueSavePrefs();
+  }
+}
+celebrateCloseBtn.addEventListener("click", () => { celebrateOverlay.hidden = true; });
+
+setGoalBtn.addEventListener("click", () => {
+  const val = parseFloat(goalInput.value);
+  if(isNaN(val) || val <= 0) return;
+  state.goal = val;
+  state.goalCelebrated = false;
+  renderGoal();
+  queueSavePrefs();
+  checkGoalAchievement();
+});
+clearGoalBtn.addEventListener("click", () => {
+  state.goal = null;
+  state.goalCelebrated = false;
+  goalInput.value = "";
+  renderGoal();
+  queueSavePrefs();
+});
+
+/* ---------- Weekly spending budget ---------- */
+function computeSpendCategory(){
+  const cats = currentCats();
+  const idx = METHODS[state.method].spendIndex;
+  return cats[idx] || cats[0];
+}
+async function resetWantsBudget(){
+  const cat = computeSpendCategory();
+  state.wantsLabel = cat.label;
+  state.wantsAllowance = state.balance * cat.pct / 100;
+  state.wantsRemaining = state.wantsAllowance;
+  state.wantsWeekStart = Date.now();
+  await savePrefsNow();
+}
+function checkWeeklyReset(){
+  if(!state.wantsWeekStart || (Date.now() - state.wantsWeekStart) >= WEEK_MS){
+    resetWantsBudget().then(renderSpendCard);
+  }
+}
+function renderSpendCard(){
+  spendCardTitle.textContent = `Weekly ${state.wantsLabel} budget`;
+  spendRemainingText.textContent = fmtMoney(state.wantsRemaining) + " left";
+  spendAllowanceText.textContent = "of " + fmtMoney(state.wantsAllowance);
+  const pct = state.wantsAllowance > 0 ? Math.max(0, Math.min(100, (state.wantsRemaining/state.wantsAllowance)*100)) : 0;
+  spendBarFill.style.width = pct + "%";
+  if(state.wantsWeekStart){
+    const msLeft = Math.max(0, WEEK_MS - (Date.now() - state.wantsWeekStart));
+    const daysLeft = Math.ceil(msLeft / (24*60*60*1000));
+    refillNote.textContent = daysLeft <= 0 ? "Refilling..." : `Refills in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+  }
+}
+spendBtn.addEventListener("click", () => {
+  spendPanel.hidden = !spendPanel.hidden;
+  if(!spendPanel.hidden){ spendAmountInput.focus(); }
+});
+confirmSpendBtn.addEventListener("click", async () => {
+  const val = parseFloat(spendAmountInput.value);
+  if(isNaN(val) || val <= 0){ spendMsg.textContent = "Enter an amount above zero."; return; }
+  if(val > state.wantsRemaining){
+    spendMsg.textContent = `You only have ${fmtMoney(state.wantsRemaining)} left in ${state.wantsLabel} this week.`;
+    return;
+  }
+  state.wantsRemaining -= val;
+  state.balance = Math.max(0, state.balance - val);
+  const note = spendNoteInput.value.trim();
+  transactions.unshift({ type: "spend", amount: val, balanceAfter: state.balance, category: state.wantsLabel, note, timestamp: Date.now() });
+  transactions = transactions.slice(0, 50);
+  await saveLedger();
+  await savePrefsNow();
+  spendAmountInput.value = "";
+  spendNoteInput.value = "";
+  spendPanel.hidden = true;
+  spendMsg.textContent = `Spent ${fmtMoney(val)} from ${state.wantsLabel}.`;
+  setTimeout(() => { spendMsg.textContent = ""; }, 2400);
+  renderPiggy();
+  renderJars();
+  renderGoal();
+  renderSpendCard();
+  renderHistory();
+});
+
+/* ---------- Methods / jars ---------- */
+function buildMethodChips(){
+  methodRow.innerHTML = "";
+  Object.keys(METHODS).forEach(key => {
+    const btn = document.createElement("button");
+    btn.className = "chip" + (key === state.method ? " active" : "");
+    btn.textContent = key === "custom" ? "Custom" : METHODS[key].name;
+    btn.addEventListener("click", async () => {
+      state.method = key;
+      await resetWantsBudget();
+      renderAll();
+    });
+    methodRow.appendChild(btn);
+  });
+}
+
+function buildCustomPanel(){
+  if(state.method !== "custom"){ customPanel.hidden = true; return; }
+  customPanel.hidden = false;
+  customPanel.innerHTML = "";
+  const total = state.customWeights.reduce((a,b)=>a+b,0) || 1;
+  state.customWeights.forEach((w, i) => {
+    const pct = ((w/total)*100).toFixed(0);
+    const row = document.createElement("div");
+    row.className = "custom-row";
+    row.innerHTML = `
+      <div class="custom-row-top">
+        <input type="text" maxlength="16" value="${state.customLabels[i]}" data-idx="${i}" class="label-input">
+        <span class="pct-readout">${pct}%</span>
+      </div>
+      <input type="range" min="1" max="100" value="${w}" data-idx="${i}" class="weight-slider">
+    `;
+    customPanel.appendChild(row);
+  });
+  customPanel.querySelectorAll(".label-input").forEach(inp => {
+    inp.addEventListener("input", (e) => {
+      state.customLabels[+e.target.dataset.idx] = e.target.value || `Category ${+e.target.dataset.idx+1}`;
+      renderJars();
+      queueSavePrefs();
+    });
+  });
+  customPanel.querySelectorAll(".weight-slider").forEach(sl => {
+    sl.addEventListener("input", (e) => {
+      state.customWeights[+e.target.dataset.idx] = +e.target.value;
+      buildCustomPanel();
+      renderJars();
+      queueSavePrefs();
+    });
+  });
+}
+
+function buildJars(){
+  jarsRow.innerHTML = "";
+  currentCats().forEach((cat, i) => {
+    const col = document.createElement("div");
+    col.className = "jar-col";
+    col.innerHTML = `
+      <div class="jar"><div class="jar-liquid" style="background:${COLORS[i]}"></div></div>
+      <div class="jar-name">${cat.label}</div>
+      <div class="jar-amount">$0.00</div>
+      <div class="jar-pct">0%</div>
+    `;
+    jarsRow.appendChild(col);
+  });
+}
+
+function renderJars(){
+  const cats = currentCats();
+  let cols = jarsRow.querySelectorAll(".jar-col");
+  if(cols.length !== cats.length){ buildJars(); cols = jarsRow.querySelectorAll(".jar-col"); }
+  cats.forEach((cat, i) => {
+    const col = cols[i];
+    if(!col) return;
+    col.querySelector(".jar-name").textContent = cat.label;
+    col.querySelector(".jar-amount").textContent = fmtMoney(state.balance * cat.pct/100);
+    col.querySelector(".jar-pct").textContent = Math.round(cat.pct) + "%";
+    col.querySelector(".jar-liquid").style.height = Math.max(0, Math.min(100, cat.pct)) + "%";
+  });
+  blurbText.textContent = METHODS[state.method].blurb;
+}
+
+function renderAll(){
+  buildMethodChips();
+  buildCustomPanel();
+  buildJars();
+  renderJars();
+  renderPiggy();
+  renderGoal();
+  renderSpendCard();
+}
+
+/* ---------- Activity ---------- */
+function renderHistory(){
+  if(transactions.length === 0){
+    historyList.innerHTML = `<p class="history-empty">No activity yet.</p>`;
+    return;
+  }
+  historyList.innerHTML = "";
+  transactions.slice(0, 30).forEach(tx => {
+    const item = document.createElement("div");
+    item.className = "history-item";
+    const date = new Date(tx.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    let dotColor, label, sign;
+    if(tx.type === "start"){ dotColor = "#93A0C4"; label = "Starting balance"; sign = ""; }
+    else if(tx.type === "spend"){ dotColor = "#FF6F6F"; label = `Spent from ${tx.category}` + (tx.note ? ` · ${tx.note}` : ""); sign = "-"; }
+    else { dotColor = "#4ECDC4"; label = "Added money"; sign = "+"; }
+    item.innerHTML = `
+      <div class="history-dot" style="background:${dotColor}"></div>
+      <div class="history-info">
+        <div class="history-amount">${sign}${fmtMoney(tx.amount)}</div>
+        <div class="history-meta">${label} · ${date} · balance ${fmtMoney(tx.balanceAfter)}</div>
+      </div>
+    `;
+    historyList.appendChild(item);
+  });
+}
+
+/* ---------- Storage ---------- */
+async function saveLedger(){
+  try{ await window.storage.set(LEDGER_KEY, JSON.stringify({ balance: state.balance, transactions }), false); }
+  catch(e){ console.error("Storage error:", e); }
+}
+function queueSavePrefs(){
+  clearTimeout(prefsSaveTimer);
+  prefsSaveTimer = setTimeout(savePrefsNow, 400);
+}
+async function savePrefsNow(){
+  try{
+    await window.storage.set(PREFS_KEY, JSON.stringify({
+      method: state.method,
+      customWeights: state.customWeights,
+      customLabels: state.customLabels,
+      goal: state.goal,
+      goalCelebrated: state.goalCelebrated,
+      wantsLabel: state.wantsLabel,
+      wantsAllowance: state.wantsAllowance,
+      wantsRemaining: state.wantsRemaining,
+      wantsWeekStart: state.wantsWeekStart
+    }), false);
+  }catch(e){ console.error("Storage error:", e); }
+}
+async function saveWishlist(){
+  try{ await window.storage.set(WISHLIST_KEY, JSON.stringify(wishlist), false); }
+  catch(e){ console.error("Storage error:", e); }
+}
+
+/* Deleting a key that doesn't exist throws, so fall back to overwriting it
+   with an empty value — that way stale data can never survive a reset. */
+async function clearKey(key, emptyValue){
+  try{
+    await window.storage.delete(key, false);
+    return true;
+  }catch(e){
+    try{
+      await window.storage.set(key, emptyValue, false);
+      return true;
+    }catch(e2){
+      console.error("Could not clear " + key, e2);
+      return false;
+    }
+  }
+}
+async function saveGiftCards(){
+  try{ await window.storage.set(GIFTCARDS_KEY, JSON.stringify(giftCards), false); }
+  catch(e){ console.error("Storage error:", e); }
+}
+
+/* ---------- Onboarding ---------- */
+onboardBtn.addEventListener("click", async () => {
+  const val = parseFloat(onboardInput.value);
+  const startBalance = isNaN(val) || val < 0 ? 0 : val;
+  state.balance = startBalance;
+  transactions = [{ type: "start", amount: startBalance, balanceAfter: startBalance, timestamp: Date.now() }];
+  await saveLedger();
+  await resetWantsBudget();
+  onboardOverlay.hidden = true;
+  appEl.hidden = false;
+  renderAll();
+  renderHistory();
+  renderGiftCards();
+});
+
+/* ---------- Add money ---------- */
+addMoneyBtn.addEventListener("click", () => {
+  addMoneyPanel.hidden = !addMoneyPanel.hidden;
+  if(!addMoneyPanel.hidden){ addAmountInput.focus(); }
+});
+confirmAddBtn.addEventListener("click", async () => {
+  const val = parseFloat(addAmountInput.value);
+  if(isNaN(val) || val <= 0){ addMsg.textContent = "Enter an amount above zero."; return; }
+  state.balance += val;
+  transactions.unshift({ type: "add", amount: val, balanceAfter: state.balance, timestamp: Date.now() });
+  transactions = transactions.slice(0, 50);
+  await saveLedger();
+  addAmountInput.value = "";
+  addMoneyPanel.hidden = true;
+  addMsg.textContent = `Added ${fmtMoney(val)} to your total.`;
+  setTimeout(() => { addMsg.textContent = ""; }, 2400);
+  renderPiggy();
+  renderJars();
+  renderGoal();
+  renderHistory();
+  checkGoalAchievement();
+});
+
+/* ---------- Reset ---------- */
+resetBtn.addEventListener("click", async () => {
+  const ok = await askConfirm(
+    "Reset everything?",
+    "This erases your balance, activity, goal, wish list, and gift cards for good.",
+    "Yes, erase it all"
+  );
+  if(!ok) return;
+  await clearKey(GIFTCARDS_KEY, "[]");
+  await clearKey(WISHLIST_KEY, "[]");
+  await clearKey(PREFS_KEY, "{}");
+  await clearKey(LEDGER_KEY, "");
+  state = {
+    balance: 0, method: "503020", customWeights: [40,35,25], customLabels: ["Save","Spend","Give"],
+    goal: null, goalCelebrated: false,
+    wantsLabel: "Wants", wantsAllowance: 0, wantsRemaining: 0, wantsWeekStart: null
+  };
+  transactions = [];
+  giftCards = [];
+  wishlist = [];
+  renderGiftCards();
+  renderWishlist();
+  renderHistory();
+  goalInput.value = "";
+  showTab("cash");
+  appEl.hidden = true;
+  onboardOverlay.hidden = false;
+  onboardInput.value = "";
+});
+
+/* ---------- Gift cards ---------- */
+function renderGiftCards(){
+  const total = giftCards.reduce((sum,c) => sum + c.balance, 0);
+  gcTotal.textContent = fmtMoney(total);
+  if(giftCards.length === 0){
+    gcList.innerHTML = `<p class="history-empty">No gift cards yet — add one above.</p>`;
+    return;
+  }
+  gcList.innerHTML = "";
+  giftCards.forEach(card => {
+    const row = document.createElement("div");
+    row.className = "gc-item";
+    row.innerHTML = `
+      <div class="gc-badge" style="background:${card.color}">${(card.name[0]||"?").toUpperCase()}</div>
+      <div class="gc-info">
+        <div class="gc-name">${card.name}</div>
+        <div class="gc-balance">${fmtMoney(card.balance)}</div>
+      </div>
+      <button class="gc-spend-btn" data-id="${card.id}">Use</button>
+      <button class="gc-del-btn" data-id="${card.id}" aria-label="Remove card">✕</button>
+    `;
+    gcList.appendChild(row);
+  });
+  gcList.querySelectorAll(".gc-spend-btn").forEach(btn => {
+    btn.addEventListener("click", () => gcSpend(btn.dataset.id));
+  });
+  gcList.querySelectorAll(".gc-del-btn").forEach(btn => {
+    btn.addEventListener("click", () => gcDelete(btn.dataset.id));
+  });
+}
+
+async function gcSpend(id){
+  const card = giftCards.find(c => c.id === id);
+  if(!card) return;
+  const val = await askAmount(`Use ${card.name}`, `How much did you spend? Balance: ${fmtMoney(card.balance)}`);
+  if(val === null) return;
+  card.balance = Math.max(0, card.balance - val);
+  await saveGiftCards();
+  renderGiftCards();
+}
+async function gcDelete(id){
+  const card = giftCards.find(c => c.id === id);
+  if(!card) return;
+  const ok = await askConfirm("Remove this card?", `${card.name} will be deleted from your gift cards.`, "Remove it");
+  if(!ok) return;
+  giftCards = giftCards.filter(c => c.id !== id);
+  await saveGiftCards();
+  renderGiftCards();
+}
+
+addGcBtn.addEventListener("click", () => {
+  addGcPanel.hidden = !addGcPanel.hidden;
+  if(!addGcPanel.hidden){ gcNameInput.focus(); }
+});
+confirmGcBtn.addEventListener("click", async () => {
+  const name = gcNameInput.value.trim();
+  const val = parseFloat(gcBalanceInput.value);
+  if(!name){ gcNameInput.focus(); return; }
+  if(isNaN(val) || val < 0) return;
+  giftCards.push({
+    id: Date.now().toString() + Math.random().toString(36).slice(2,7),
+    name,
+    balance: val,
+    color: GC_COLORS[giftCards.length % GC_COLORS.length],
+    createdAt: Date.now()
+  });
+  await saveGiftCards();
+  gcNameInput.value = "";
+  gcBalanceInput.value = "";
+  addGcPanel.hidden = true;
+  renderGiftCards();
+});
+
+/* ---------- Wish list ---------- */
+function renderWishlist(){
+  if(wishlist.length === 0){
+    wishList.innerHTML = `<p class="history-empty">No wishes yet — add something you're saving for.</p>`;
+    return;
+  }
+  wishList.innerHTML = "";
+  wishlist.forEach(item => {
+    const pct = item.target > 0 ? Math.min(100, (item.saved/item.target)*100) : 0;
+    const done = item.saved >= item.target && item.target > 0;
+    const row = document.createElement("div");
+    row.className = "wish-item";
+    row.innerHTML = `
+      <div class="wish-top">
+        <div class="wish-name">${item.name}</div>
+        <button class="gc-del-btn" data-id="${item.id}" aria-label="Remove wish">✕</button>
+      </div>
+      <div class="goal-row"><span>${fmtMoney(item.saved)}</span><span>of ${fmtMoney(item.target)}</span></div>
+      <div class="goal-bar"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+      <button class="gc-spend-btn wish-add-btn" data-id="${item.id}">${done ? "✅ Saved up! Add more" : "+ Add funds"}</button>
+    `;
+    wishList.appendChild(row);
+  });
+  wishList.querySelectorAll(".gc-del-btn").forEach(btn => {
+    btn.addEventListener("click", () => wishDelete(btn.dataset.id));
+  });
+  wishList.querySelectorAll(".wish-add-btn").forEach(btn => {
+    btn.addEventListener("click", () => wishAddFunds(btn.dataset.id));
+  });
+}
+async function wishAddFunds(id){
+  const item = wishlist.find(w => w.id === id);
+  if(!item) return;
+  const val = await askAmount(`Save toward ${item.name}`, `Saved so far: ${fmtMoney(item.saved)} of ${fmtMoney(item.target)}`);
+  if(val === null) return;
+  item.saved += val;
+  await saveWishlist();
+  renderWishlist();
+}
+async function wishDelete(id){
+  const item = wishlist.find(w => w.id === id);
+  if(!item) return;
+  const ok = await askConfirm("Remove this wish?", `${item.name} will be deleted from your wish list.`, "Remove it");
+  if(!ok) return;
+  wishlist = wishlist.filter(w => w.id !== id);
+  await saveWishlist();
+  renderWishlist();
+}
+addWishBtn.addEventListener("click", () => {
+  addWishPanel.hidden = !addWishPanel.hidden;
+  if(!addWishPanel.hidden){ wishNameInput.focus(); }
+});
+confirmWishBtn.addEventListener("click", async () => {
+  const name = wishNameInput.value.trim();
+  const target = parseFloat(wishTargetInput.value);
+  if(!name){ wishNameInput.focus(); return; }
+  if(isNaN(target) || target <= 0) return;
+  wishlist.push({
+    id: Date.now().toString() + Math.random().toString(36).slice(2,7),
+    name, target, saved: 0, createdAt: Date.now()
+  });
+  await saveWishlist();
+  wishNameInput.value = "";
+  wishTargetInput.value = "";
+  addWishPanel.hidden = true;
+  renderWishlist();
+});
+
+/* ---------- Want or Need checker ---------- */
+const CHECK_QUESTIONS = [
+  { q: "If you don't buy this, does something actually go wrong — school, health, safety, or getting around?", needAnswer: "yes", weight: 2 },
+  { q: "Do you already own something that does this same job?", needAnswer: "no", weight: 1 },
+  { q: "Did you want this before today?", needAnswer: "yes", weight: 1 },
+  { q: "Is there a cheaper version that would solve the same problem?", needAnswer: "no", weight: 1 },
+  { q: "If you waited two weeks, would you still want it?", needAnswer: "yes", weight: 1 }
+];
+const MAX_SCORE = CHECK_QUESTIONS.reduce((s,q) => s + q.weight, 0);
+
+const checkerOverlay = $("#checkerOverlay");
+const checkerStart = $("#checkerStart");
+const checkerQuestion = $("#checkerQuestion");
+const checkerResult = $("#checkerResult");
+const checkerItemInput = $("#checkerItemInput");
+const checkerPriceInput = $("#checkerPriceInput");
+const checkerStartBtn = $("#checkerStartBtn");
+const checkerCancelBtn = $("#checkerCancelBtn");
+const checkerProgress = $("#checkerProgress");
+const checkerQText = $("#checkerQText");
+const checkerYesBtn = $("#checkerYesBtn");
+const checkerNoBtn = $("#checkerNoBtn");
+const verdictBadge = $("#verdictBadge");
+const verdictText = $("#verdictText");
+const verdictSpendBtn = $("#verdictSpendBtn");
+const verdictWishBtn = $("#verdictWishBtn");
+const verdictCloseBtn = $("#verdictCloseBtn");
+const checkerWarn = $("#checkerWarn");
+const openCheckerBtn = $("#openCheckerBtn");
+
+let checkIdx = 0, checkScore = 0, checkItem = "", checkPrice = 0;
+
+function openChecker(){
+  checkIdx = 0; checkScore = 0; checkItem = ""; checkPrice = 0;
+  checkerItemInput.value = "";
+  checkerPriceInput.value = "";
+  checkerWarn.textContent = "";
+  checkerStart.hidden = false;
+  checkerQuestion.hidden = true;
+  checkerResult.hidden = true;
+  checkerOverlay.hidden = false;
+}
+function closeChecker(){ checkerOverlay.hidden = true; }
+
+openCheckerBtn.addEventListener("click", openChecker);
+checkerCancelBtn.addEventListener("click", closeChecker);
+verdictCloseBtn.addEventListener("click", closeChecker);
+
+checkerStartBtn.addEventListener("click", () => {
+  const name = checkerItemInput.value.trim();
+  const price = parseFloat(checkerPriceInput.value);
+  if(!name){ checkerItemInput.focus(); return; }
+  if(isNaN(price) || price <= 0){ checkerPriceInput.focus(); return; }
+  checkItem = name;
+  checkPrice = price;
+  checkIdx = 0;
+  checkScore = 0;
+  checkerStart.hidden = true;
+  checkerQuestion.hidden = false;
+  showQuestion();
+});
+
+function showQuestion(){
+  const item = CHECK_QUESTIONS[checkIdx];
+  checkerProgress.textContent = `QUESTION ${checkIdx + 1} OF ${CHECK_QUESTIONS.length}`;
+  checkerQText.textContent = item.q;
+}
+
+function answerQuestion(answer){
+  const item = CHECK_QUESTIONS[checkIdx];
+  if(answer === item.needAnswer){ checkScore += item.weight; }
+  checkIdx++;
+  if(checkIdx < CHECK_QUESTIONS.length){
+    showQuestion();
+  }else{
+    showVerdict();
+  }
+}
+checkerYesBtn.addEventListener("click", () => answerQuestion("yes"));
+checkerNoBtn.addEventListener("click", () => answerQuestion("no"));
+
+function showVerdict(){
+  checkerQuestion.hidden = true;
+  checkerResult.hidden = false;
+  checkerWarn.textContent = "";
+
+  let badge, text;
+  if(checkScore >= 5){
+    badge = "✅ Looks like a NEED";
+    text = `${checkItem} at ${fmtMoney(checkPrice)} holds up. This one seems worth buying.`;
+  }else if(checkScore >= 3){
+    badge = "🤔 Somewhere in between";
+    text = `${checkItem} isn't essential, but it's not impulsive either. If it fits your ${state.wantsLabel} budget, go for it.`;
+  }else{
+    badge = "🛍️ This is a WANT";
+    text = `${checkItem} is something you like, not something you need. That's fine — just spend from ${state.wantsLabel}, or park it on your wish list and see if you still want it in two weeks.`;
+  }
+  verdictBadge.textContent = badge;
+  verdictText.textContent = text;
+
+  if(checkPrice > state.wantsRemaining){
+    verdictSpendBtn.disabled = true;
+    verdictSpendBtn.style.opacity = "0.45";
+    checkerWarn.textContent = `You only have ${fmtMoney(state.wantsRemaining)} left in ${state.wantsLabel} this week.`;
+  }else{
+    verdictSpendBtn.disabled = false;
+    verdictSpendBtn.style.opacity = "1";
+  }
+}
+
+verdictSpendBtn.addEventListener("click", async () => {
+  if(checkPrice > state.wantsRemaining) return;
+  state.wantsRemaining -= checkPrice;
+  state.balance = Math.max(0, state.balance - checkPrice);
+  transactions.unshift({
+    type: "spend", amount: checkPrice, balanceAfter: state.balance,
+    category: state.wantsLabel, note: checkItem, timestamp: Date.now()
+  });
+  transactions = transactions.slice(0, 50);
+  await saveLedger();
+  await savePrefsNow();
+  closeChecker();
+  renderPiggy();
+  renderJars();
+  renderGoal();
+  renderSpendCard();
+  renderHistory();
+  spendMsg.textContent = `Spent ${fmtMoney(checkPrice)} on ${checkItem}.`;
+  setTimeout(() => { spendMsg.textContent = ""; }, 2400);
+});
+
+verdictWishBtn.addEventListener("click", async () => {
+  wishlist.push({
+    id: Date.now().toString() + Math.random().toString(36).slice(2,7),
+    name: checkItem, target: checkPrice, saved: 0, createdAt: Date.now()
+  });
+  await saveWishlist();
+  renderWishlist();
+  closeChecker();
+  showTab("wish");
+});
+
+/* ---------- Init ---------- */
+async function loadGiftCards(){
+  try{
+    const res = await window.storage.get(GIFTCARDS_KEY, false);
+    giftCards = JSON.parse(res.value) || [];
+  }catch(e){ giftCards = []; }
+  renderGiftCards();
+}
+
+async function loadWishlist(){
+  try{
+    const res = await window.storage.get(WISHLIST_KEY, false);
+    wishlist = JSON.parse(res.value) || [];
+  }catch(e){ wishlist = []; }
+  renderWishlist();
+}
+
+async function init(){
+  await loadGiftCards();
+  await loadWishlist();
+  try{
+    const res = await window.storage.get(LEDGER_KEY, false);
+    const ledger = JSON.parse(res.value);
+    state.balance = ledger.balance || 0;
+    transactions = ledger.transactions || [];
+    let hasWantsData = false;
+    try{
+      const p = await window.storage.get(PREFS_KEY, false);
+      const prefs = JSON.parse(p.value);
+      state.method = prefs.method || state.method;
+      state.customWeights = prefs.customWeights || state.customWeights;
+      state.customLabels = prefs.customLabels || state.customLabels;
+      state.goal = typeof prefs.goal === "number" ? prefs.goal : null;
+      state.goalCelebrated = !!prefs.goalCelebrated;
+      if(prefs.wantsWeekStart){
+        state.wantsLabel = prefs.wantsLabel || state.wantsLabel;
+        state.wantsAllowance = prefs.wantsAllowance || 0;
+        state.wantsRemaining = typeof prefs.wantsRemaining === "number" ? prefs.wantsRemaining : 0;
+        state.wantsWeekStart = prefs.wantsWeekStart;
+        hasWantsData = true;
+      }
+    }catch(e){ /* no prefs saved yet, use defaults */ }
+    onboardOverlay.hidden = true;
+    appEl.hidden = false;
+    if(!hasWantsData){
+      await resetWantsBudget();
+    }
+    renderAll();
+    renderHistory();
+    checkGoalAchievement();
+    checkWeeklyReset();
+  }catch(e){
+    onboardOverlay.hidden = false;
+    appEl.hidden = true;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if(!document.hidden && !appEl.hidden){
+    checkWeeklyReset();
+    renderSpendCard();
+  }
+});
+
+init();
+</script>
+</body>
+</html>
